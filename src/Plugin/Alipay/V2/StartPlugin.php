@@ -47,22 +47,40 @@ class StartPlugin implements PluginInterface
         $tenant = get_tenant($params);
         $config = get_provider_config('alipay', $params);
 
-        return [
+        $payload = [
             'app_id' => $config['app_id'] ?? '',
             'method' => '',
             'format' => 'JSON',
             'return_url' => $this->getReturnUrl($params, $config),
             'charset' => 'utf-8',
-            'sign_type' => 'RSA2',
+            'sign_type' => strtoupper($config['sign_type'] ?? 'RSA2'),
             'sign' => '',
             'timestamp' => date('Y-m-d H:i:s'),
             'version' => '1.0',
             'notify_url' => $this->getNotifyUrl($params, $config),
             'app_auth_token' => $this->getAppAuthToken($params, $config),
-            'app_cert_sn' => $this->getAppCertSn($tenant, $config),
-            'alipay_root_cert_sn' => $this->getAlipayRootCertSn($tenant, $config),
-            'biz_content' => [],
         ];
+
+        // 证书模式才下发证书序列号，公钥模式不下发
+        if ($this->isCertMode($config)) {
+            $payload['app_cert_sn'] = $this->getAppCertSn($tenant, $config);
+            $payload['alipay_root_cert_sn'] = $this->getAlipayRootCertSn($tenant, $config);
+        }
+
+        $payload['biz_content'] = [];
+
+        return $payload;
+    }
+
+    /**
+     * 判断是否为证书模式.
+     *
+     * - 配置了 alipay_public_key（公钥模式标志）则为公钥模式
+     * - 否则默认为证书模式（向后兼容）
+     */
+    protected function isCertMode(array $config): bool
+    {
+        return empty($config['alipay_public_key']);
     }
 
     protected function getReturnUrl(array $params, array $config): string

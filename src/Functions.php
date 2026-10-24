@@ -40,7 +40,17 @@ function get_tenant(array $params = []): string
 
 function get_public_cert(string $key): string
 {
-    return is_file($key) ? file_get_contents($key) : $key;
+    if (is_file($key)) {
+        return file_get_contents($key);
+    }
+
+    if (Str::startsWith($key, '-----BEGIN')) {
+        return $key;
+    }
+
+    return "-----BEGIN PUBLIC KEY-----\n"
+        .wordwrap($key, 64, "\n", true)
+        ."\n-----END PUBLIC KEY-----";
 }
 
 function get_private_cert(string $key): string
@@ -49,7 +59,7 @@ function get_private_cert(string $key): string
         return file_get_contents($key);
     }
 
-    if (Str::startsWith($key, '-----BEGIN PRIVATE KEY-----')) {
+    if (Str::startsWith($key, '-----BEGIN')) {
         return $key;
     }
 
@@ -112,17 +122,24 @@ function verify_alipay_sign(array $config, string $contents, string $sign): void
         throw new InvalidSignException(Exception::SIGN_EMPTY, '签名异常: 验证支付宝签名失败-支付宝签名为空', func_get_args());
     }
 
-    $public = $config['alipay_public_cert_path'] ?? null;
+    // 优先使用证书模式（新），其次使用公钥模式（老）
+    $public = $config['alipay_public_cert_path']?? $config['alipay_public_key']?? null;
 
     if (empty($public)) {
-        throw new InvalidConfigException(Exception::CONFIG_ALIPAY_INVALID, '配置异常: 缺少支付宝配置 -- [alipay_public_cert_path]');
+        throw new InvalidConfigException(Exception::CONFIG_ALIPAY_INVALID, '配置异常: 缺少支付宝配置 -- [alipay_public_cert_path] 或 [alipay_public_key]');
     }
+
+    // 签名算法：支持配置 sign_type（RSA/RSA2），默认 RSA2
+    $algorithm = match (strtoupper($config['sign_type'] ?? 'RSA2')) {
+        'RSA' => OPENSSL_ALGO_SHA1,
+        default => OPENSSL_ALGO_SHA256,
+    };
 
     $result = 1 === openssl_verify(
         $contents,
         base64_decode($sign),
         get_public_cert($public),
-        OPENSSL_ALGO_SHA256
+        $algorithm
     );
 
     if (!$result) {
