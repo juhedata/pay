@@ -11,7 +11,11 @@ use Yansongda\Artful\Plugin\ParserPlugin;
 use Yansongda\Artful\Plugin\StartPlugin;
 use Yansongda\Pay\Exception\Exception;
 use Yansongda\Pay\Plugin\Wechat\AddRadarPlugin;
+use Yansongda\Pay\Plugin\Wechat\NormalizeParamsPlugin;
 use Yansongda\Pay\Plugin\Wechat\ResponsePlugin;
+use Yansongda\Pay\Plugin\Wechat\V2\AddPayloadSignaturePlugin as V2AddPayloadSignaturePlugin;
+use Yansongda\Pay\Plugin\Wechat\V2\Pay\QueryPlugin as V2QueryPlugin;
+use Yansongda\Pay\Plugin\Wechat\V2\VerifySignaturePlugin as V2VerifySignaturePlugin;
 use Yansongda\Pay\Plugin\Wechat\V3\AddPayloadSignaturePlugin;
 use Yansongda\Pay\Plugin\Wechat\V3\Marketing\MchTransfer\QueryByWxPlugin as MchTransferQueryByWxPlugin;
 use Yansongda\Pay\Plugin\Wechat\V3\Marketing\MchTransfer\QueryPlugin as MchTransferQueryPlugin;
@@ -31,6 +35,9 @@ use Yansongda\Pay\Plugin\Wechat\V3\Pay\Native\QueryRefundPlugin as NativeQueryRe
 use Yansongda\Pay\Plugin\Wechat\V3\VerifySignaturePlugin;
 use Yansongda\Supports\Str;
 
+use function Yansongda\Pay\get_provider_config;
+use function Yansongda\Pay\is_wechat_v2;
+
 class QueryShortcut implements ShortcutInterface
 {
     /**
@@ -38,6 +45,12 @@ class QueryShortcut implements ShortcutInterface
      */
     public function getPlugins(array $params): array
     {
+        $isV2 = is_wechat_v2(get_provider_config('wechat', $params));
+
+        if ($isV2) {
+            return $this->v2Plugins();
+        }
+
         if (isset($params['combine_out_trade_no'])) {
             return $this->combinePlugins();
         }
@@ -51,6 +64,21 @@ class QueryShortcut implements ShortcutInterface
         throw new InvalidParamsException(Exception::PARAMS_SHORTCUT_ACTION_INVALID, "您所提供的 action 方法 [{$method}] 不支持，请参考文档或源码确认");
     }
 
+    protected function v2Plugins(): array
+    {
+        return [
+            StartPlugin::class,
+            NormalizeParamsPlugin::class,
+            V2QueryPlugin::class,
+            V2AddPayloadSignaturePlugin::class,
+            AddPayloadBodyPlugin::class,
+            AddRadarPlugin::class,
+            V2VerifySignaturePlugin::class,
+            ResponsePlugin::class,
+            ParserPlugin::class,
+        ];
+    }
+
     protected function defaultPlugins(): array
     {
         return $this->jsapiPlugins();
@@ -60,6 +88,7 @@ class QueryShortcut implements ShortcutInterface
     {
         return [
             StartPlugin::class,
+            NormalizeParamsPlugin::class,
             AppQueryPlugin::class,
             AddPayloadBodyPlugin::class,
             AddPayloadSignaturePlugin::class,
@@ -74,6 +103,7 @@ class QueryShortcut implements ShortcutInterface
     {
         return [
             StartPlugin::class,
+            NormalizeParamsPlugin::class,
             CombineQueryPlugin::class,
             AddPayloadBodyPlugin::class,
             AddPayloadSignaturePlugin::class,
@@ -88,6 +118,7 @@ class QueryShortcut implements ShortcutInterface
     {
         return [
             StartPlugin::class,
+            NormalizeParamsPlugin::class,
             H5QueryPlugin::class,
             AddPayloadBodyPlugin::class,
             AddPayloadSignaturePlugin::class,
@@ -102,6 +133,7 @@ class QueryShortcut implements ShortcutInterface
     {
         return [
             StartPlugin::class,
+            NormalizeParamsPlugin::class,
             JsapiQueryPlugin::class,
             AddPayloadBodyPlugin::class,
             AddPayloadSignaturePlugin::class,
@@ -116,6 +148,7 @@ class QueryShortcut implements ShortcutInterface
     {
         return [
             StartPlugin::class,
+            NormalizeParamsPlugin::class,
             MiniQueryPlugin::class,
             AddPayloadBodyPlugin::class,
             AddPayloadSignaturePlugin::class,
@@ -130,6 +163,7 @@ class QueryShortcut implements ShortcutInterface
     {
         return [
             StartPlugin::class,
+            NormalizeParamsPlugin::class,
             NativeQueryPlugin::class,
             AddPayloadBodyPlugin::class,
             AddPayloadSignaturePlugin::class,
@@ -150,6 +184,7 @@ class QueryShortcut implements ShortcutInterface
 
         return [
             StartPlugin::class,
+            NormalizeParamsPlugin::class,
             $query,
             AddPayloadBodyPlugin::class,
             AddPayloadSignaturePlugin::class,
@@ -169,6 +204,7 @@ class QueryShortcut implements ShortcutInterface
     {
         return [
             StartPlugin::class,
+            NormalizeParamsPlugin::class,
             AppQueryRefundPlugin::class,
             AddPayloadBodyPlugin::class,
             AddPayloadSignaturePlugin::class,
@@ -183,6 +219,7 @@ class QueryShortcut implements ShortcutInterface
     {
         return [
             StartPlugin::class,
+            NormalizeParamsPlugin::class,
             CombineQueryRefundPlugin::class,
             AddPayloadBodyPlugin::class,
             AddPayloadSignaturePlugin::class,
@@ -197,6 +234,7 @@ class QueryShortcut implements ShortcutInterface
     {
         return [
             StartPlugin::class,
+            NormalizeParamsPlugin::class,
             H5QueryRefundPlugin::class,
             AddPayloadBodyPlugin::class,
             AddPayloadSignaturePlugin::class,
@@ -211,6 +249,7 @@ class QueryShortcut implements ShortcutInterface
     {
         return [
             StartPlugin::class,
+            NormalizeParamsPlugin::class,
             JsapiQueryRefundPlugin::class,
             AddPayloadBodyPlugin::class,
             AddPayloadSignaturePlugin::class,
@@ -225,6 +264,7 @@ class QueryShortcut implements ShortcutInterface
     {
         return [
             StartPlugin::class,
+            NormalizeParamsPlugin::class,
             MiniQueryRefundPlugin::class,
             AddPayloadBodyPlugin::class,
             AddPayloadSignaturePlugin::class,
@@ -239,6 +279,7 @@ class QueryShortcut implements ShortcutInterface
     {
         return [
             StartPlugin::class,
+            NormalizeParamsPlugin::class,
             NativeQueryRefundPlugin::class,
             AddPayloadBodyPlugin::class,
             AddPayloadSignaturePlugin::class,
@@ -253,6 +294,7 @@ class QueryShortcut implements ShortcutInterface
     {
         return [
             StartPlugin::class,
+            NormalizeParamsPlugin::class,
             TransferQueryPlugin::class,
             AddPayloadBodyPlugin::class,
             AddPayloadSignaturePlugin::class,

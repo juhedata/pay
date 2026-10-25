@@ -11,7 +11,11 @@ use Yansongda\Artful\Plugin\ParserPlugin;
 use Yansongda\Artful\Plugin\StartPlugin;
 use Yansongda\Pay\Exception\Exception;
 use Yansongda\Pay\Plugin\Wechat\AddRadarPlugin;
+use Yansongda\Pay\Plugin\Wechat\NormalizeParamsPlugin;
 use Yansongda\Pay\Plugin\Wechat\ResponsePlugin;
+use Yansongda\Pay\Plugin\Wechat\V2\AddPayloadSignaturePlugin as V2AddPayloadSignaturePlugin;
+use Yansongda\Pay\Plugin\Wechat\V2\Pay\ClosePlugin as V2ClosePlugin;
+use Yansongda\Pay\Plugin\Wechat\V2\VerifySignaturePlugin as V2VerifySignaturePlugin;
 use Yansongda\Pay\Plugin\Wechat\V3\AddPayloadSignaturePlugin;
 use Yansongda\Pay\Plugin\Wechat\V3\Pay\App\ClosePlugin as AppClosePlugin;
 use Yansongda\Pay\Plugin\Wechat\V3\Pay\Combine\ClosePlugin as CombineClosePlugin;
@@ -22,6 +26,9 @@ use Yansongda\Pay\Plugin\Wechat\V3\Pay\Native\ClosePlugin as NativeClosePlugin;
 use Yansongda\Pay\Plugin\Wechat\V3\VerifySignaturePlugin;
 use Yansongda\Supports\Str;
 
+use function Yansongda\Pay\get_provider_config;
+use function Yansongda\Pay\is_wechat_v2;
+
 class CloseShortcut implements ShortcutInterface
 {
     /**
@@ -29,6 +36,10 @@ class CloseShortcut implements ShortcutInterface
      */
     public function getPlugins(array $params): array
     {
+        if (is_wechat_v2(get_provider_config('wechat', $params))) {
+            return $this->v2Plugins();
+        }
+
         if (isset($params['combine_out_trade_no']) || isset($params['sub_orders'])) {
             return $this->combinePlugins();
         }
@@ -42,6 +53,21 @@ class CloseShortcut implements ShortcutInterface
         throw new InvalidParamsException(Exception::PARAMS_SHORTCUT_ACTION_INVALID, "您所提供的 action 方法 [{$method}] 不支持，请参考文档或源码确认");
     }
 
+    protected function v2Plugins(): array
+    {
+        return [
+            StartPlugin::class,
+            NormalizeParamsPlugin::class,
+            V2ClosePlugin::class,
+            V2AddPayloadSignaturePlugin::class,
+            AddPayloadBodyPlugin::class,
+            AddRadarPlugin::class,
+            V2VerifySignaturePlugin::class,
+            ResponsePlugin::class,
+            ParserPlugin::class,
+        ];
+    }
+
     protected function defaultPlugins(): array
     {
         return $this->jsapiPlugins();
@@ -51,6 +77,7 @@ class CloseShortcut implements ShortcutInterface
     {
         return [
             StartPlugin::class,
+            NormalizeParamsPlugin::class,
             AppClosePlugin::class,
             AddPayloadBodyPlugin::class,
             AddPayloadSignaturePlugin::class,
@@ -65,6 +92,7 @@ class CloseShortcut implements ShortcutInterface
     {
         return [
             StartPlugin::class,
+            NormalizeParamsPlugin::class,
             H5ClosePlugin::class,
             AddPayloadBodyPlugin::class,
             AddPayloadSignaturePlugin::class,
@@ -79,6 +107,7 @@ class CloseShortcut implements ShortcutInterface
     {
         return [
             StartPlugin::class,
+            NormalizeParamsPlugin::class,
             JsapiClosePlugin::class,
             AddPayloadBodyPlugin::class,
             AddPayloadSignaturePlugin::class,
@@ -93,6 +122,7 @@ class CloseShortcut implements ShortcutInterface
     {
         return [
             StartPlugin::class,
+            NormalizeParamsPlugin::class,
             MiniClosePlugin::class,
             AddPayloadBodyPlugin::class,
             AddPayloadSignaturePlugin::class,
@@ -107,6 +137,7 @@ class CloseShortcut implements ShortcutInterface
     {
         return [
             StartPlugin::class,
+            NormalizeParamsPlugin::class,
             NativeClosePlugin::class,
             AddPayloadBodyPlugin::class,
             AddPayloadSignaturePlugin::class,
@@ -121,6 +152,7 @@ class CloseShortcut implements ShortcutInterface
     {
         return [
             StartPlugin::class,
+            NormalizeParamsPlugin::class,
             CombineClosePlugin::class,
             AddPayloadBodyPlugin::class,
             AddPayloadSignaturePlugin::class,

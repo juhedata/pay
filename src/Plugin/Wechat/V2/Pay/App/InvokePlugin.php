@@ -45,9 +45,15 @@ class InvokePlugin implements PluginInterface
         $prepayId = $destination?->get('prepay_id') ?? null;
 
         if (is_null($prepayId)) {
-            Logger::error('[Wechat][V2][Pay][App][InvokePlugin] 预下单失败：响应缺少 `prepay_id` 参数，请自行检查参数是否符合微信要求', $destination?->all() ?? null);
+            $responseData = $destination?->all() ?? [];
+            Logger::error('[Wechat][V2][Pay][App][InvokePlugin] 预下单失败：响应缺少 `prepay_id` 参数', $responseData);
 
-            throw new InvalidResponseException(Exception::RESPONSE_MISSING_NECESSARY_PARAMS, $destination?->get('message') ?? '预下单失败：响应缺少 `prepay_id` 参数，请自行检查参数是否符合微信要求', $destination?->all() ?? null);
+            // 优先返回微信的错误信息
+            $errorMessage = $destination?->get('err_code_des')
+                ?? $destination?->get('return_msg')
+                ?? '预下单失败：响应缺少 `prepay_id` 参数，请自行检查参数是否符合微信要求';
+
+            throw new InvalidResponseException(Exception::RESPONSE_MISSING_NECESSARY_PARAMS, $errorMessage, $responseData);
         }
 
         $params = $rocket->getParams();

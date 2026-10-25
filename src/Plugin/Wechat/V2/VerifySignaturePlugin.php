@@ -38,7 +38,16 @@ class VerifySignaturePlugin implements PluginInterface
             return $rocket;
         }
 
-        verify_wechat_sign_v2($config, $rocket->getDestination()?->all() ?? []);
+        $destination = $rocket->getDestination()?->all() ?? [];
+
+        // 微信 V2 错误响应可能不带 sign 字段，跳过验签让错误信息透传
+        if (empty($destination['sign']) && ($destination['return_code'] ?? '') === 'FAIL') {
+            Logger::warning('[Wechat][V2][VerifySignaturePlugin] 微信返回错误响应且无签名，跳过验签', $destination);
+
+            return $rocket;
+        }
+
+        verify_wechat_sign_v2($config, $destination);
 
         Logger::info('[Wechat][V2][VerifySignaturePlugin] 插件装载完毕', ['rocket' => $rocket]);
 

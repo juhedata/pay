@@ -23,12 +23,16 @@ use Yansongda\Pay\Event\CallbackReceived;
 use Yansongda\Pay\Event\MethodCalled;
 use Yansongda\Pay\Pay;
 use Yansongda\Pay\Plugin\Wechat\AddRadarPlugin;
+use Yansongda\Pay\Plugin\Wechat\NormalizeParamsPlugin;
 use Yansongda\Pay\Plugin\Wechat\ResponsePlugin;
 use Yansongda\Pay\Plugin\Wechat\V3\AddPayloadSignaturePlugin;
 use Yansongda\Pay\Plugin\Wechat\V3\CallbackPlugin;
 use Yansongda\Pay\Plugin\Wechat\V3\VerifySignaturePlugin;
 use Yansongda\Supports\Collection;
 use Yansongda\Supports\Str;
+
+use function Yansongda\Pay\get_provider_config;
+use function Yansongda\Pay\is_wechat_v2;
 
 /**
  * @method Collection|Rocket app(array $order)      APP 支付
@@ -123,20 +127,37 @@ class Wechat implements ProviderInterface
      * @throws ContainerException
      * @throws InvalidParamsException
      */
-    public function callback(null|array|ServerRequestInterface $contents = null, ?array $params = null): Collection|Rocket
+    public function callback(null|array|ServerRequestInterface|string $contents = null, ?array $params = null): Collection|Rocket
     {
         $request = $this->getCallbackParams($contents);
 
         Event::dispatch(new CallbackReceived('wechat', clone $request, $params, null));
 
+        $config = get_provider_config('wechat', $params ?? []);
+        $callbackPlugin = is_wechat_v2($config)
+            ? \Yansongda\Pay\Plugin\Wechat\V2\CallbackPlugin::class
+            : CallbackPlugin::class;
+
         return $this->pay(
-            [CallbackPlugin::class],
+            [$callbackPlugin],
             ['_request' => $request, '_params' => $params]
         );
     }
 
-    public function success(): ResponseInterface
+    public function success(?array $params = null): ResponseInterface
     {
+        if (null !== $params) {
+            $config = get_provider_config('wechat', $params);
+
+            if (is_wechat_v2($config)) {
+                return new Response(
+                    200,
+                    ['Content-Type' => 'application/xml'],
+                    '<xml><return_code><![CDATA[SUCCESS]]></return_code><return_msg><![CDATA[OK]]></return_msg></xml>'
+                );
+            }
+        }
+
         return new Response(
             200,
             ['Content-Type' => 'application/json'],
@@ -147,14 +168,19 @@ class Wechat implements ProviderInterface
     public function mergeCommonPlugins(array $plugins): array
     {
         return array_merge(
-            [StartPlugin::class],
+            [StartPlugin::class, NormalizeParamsPlugin::class],
             $plugins,
             [AddPayloadBodyPlugin::class, AddPayloadSignaturePlugin::class, AddRadarPlugin::class, VerifySignaturePlugin::class, ResponsePlugin::class, ParserPlugin::class],
         );
     }
 
-    protected function getCallbackParams(null|array|ServerRequestInterface $contents = null): ServerRequestInterface
+    protected function getCallbackParams(null|array|ServerRequestInterface|string $contents = null): ServerRequestInterface
     {
+        // 支持直接传入原始 XML/JSON 字符串（向后兼容老版本）
+        if (is_string($contents)) {
+            return new ServerRequest('POST', 'http://localhost', [], $contents);
+        }
+
         if (is_array($contents) && isset($contents['body'], $contents['headers'])) {
             return new ServerRequest('POST', 'http://localhost', $contents['headers'], $contents['body']);
         }

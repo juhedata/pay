@@ -208,6 +208,16 @@ function get_wechat_type_key(array $params): string
 }
 
 /**
+ * 判断当前微信配置是否应走 V2 流程.
+ *
+ * 规则：有 V2 密钥（mch_secret_key_v2）且没有 V3 商户证书（mch_secret_cert）时返回 true。
+ */
+function is_wechat_v2(array $config): bool
+{
+    return !empty($config['mch_secret_key_v2']) && empty($config['mch_secret_cert']);
+}
+
+/**
  * @throws InvalidConfigException
  */
 function get_wechat_sign(array $config, string $contents): string
